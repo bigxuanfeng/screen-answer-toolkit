@@ -581,22 +581,36 @@ class AnswerApp:
         # 检查中文语言包，缺失则自动下载
         chi_sim_path = os.path.join(user_tessdata, "chi_sim.traineddata")
         if not os.path.exists(chi_sim_path):
-            self.log("中文语言包缺失，正在自动下载...")
-            self.root.after(100, lambda: threading.Thread(
+            self.root.after(500, lambda: self.log("中文语言包缺失，正在自动下载..."))
+            self.root.after(500, lambda: threading.Thread(
                 target=self._download_chi_sim, args=(user_tessdata,), daemon=True).start())
         return True
 
     def _download_chi_sim(self, tessdata_dir):
         import urllib.request
-        url = "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
         dest = os.path.join(tessdata_dir, "chi_sim.traineddata")
-        try:
-            self.root.after(0, lambda: self.log("下载中... (~15MB，首次需要等待)"))
-            urllib.request.urlretrieve(url, dest)
-            self.root.after(0, lambda: self.log("\u2705 中文语言包下载完成"))
-        except Exception as e:
-            self.root.after(0, lambda: self.log(
-                f"\u26a0 自动下载失败: {e}\n请手动下载 chi_sim.traineddata 放到 {tessdata_dir}"))
+        # 多镜像尝试（国内可用 CDN 优先）
+        urls = [
+            "https://gh-proxy.com/https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata",
+            "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata@main/chi_sim.traineddata",
+            "https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/chi_sim.traineddata",
+        ]
+        for url in urls:
+            try:
+                self.root.after(0, lambda u=url: self.log(f"下载中... (~15MB，首次需要等待)"))
+                urllib.request.urlretrieve(url, dest)
+                # 验证大小（正常约 15MB）
+                if os.path.getsize(dest) > 1000000:
+                    self.root.after(0, lambda: self.log("\u2705 中文语言包下载完成"))
+                    return
+                else:
+                    os.remove(dest)
+            except Exception:
+                if os.path.exists(dest) and os.path.getsize(dest) < 1000000:
+                    os.remove(dest)
+                continue
+        self.root.after(0, lambda: self.log(
+            f"\u26a0 自动下载失败，请手动下载 chi_sim.traineddata 放到 {tessdata_dir}"))
 
     def load_config_ui(self):
         self.api_key_var.set(self.config.get("api_key", ""))
@@ -611,6 +625,8 @@ class AnswerApp:
     # ==================== 业务逻辑 ====================
 
     def log(self, msg):
+        if not hasattr(self, "answer_text"):
+            return  # UI 还没构建完，跳过
         self.answer_text.insert("end", f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
         self.answer_text.see("end")
 
