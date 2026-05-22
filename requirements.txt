@@ -1,4 +1,3 @@
-# 工具箱依赖（连点器 + 答题助手）
 opencv-python
 numpy
 pyautogui
@@ -7,4 +6,3 @@ mss
 keyboard
 openai
 pytesseract
-# Tesseract-OCR 需手动安装: winget install UB-Mannheim.TesseractOCR
