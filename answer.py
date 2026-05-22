@@ -547,20 +547,56 @@ class AnswerApp:
     def _check_tesseract(self):
         if not HAS_TESSERACT:
             return False
-        # 尝试几个常见路径
+        import shutil as _shutil
+        found = None
         for path in [
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
             r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
             r"C:\Users\linxuan\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
         ]:
             if os.path.exists(path):
-                pytesseract.pytesseract.tesseract_cmd = path
-                return True
-        # 在 PATH 中找
-        import shutil
-        if shutil.which("tesseract"):
-            return True
-        return False
+                found = path
+                break
+        if not found:
+            found = _shutil.which("tesseract")
+        if not found:
+            return False
+
+        pytesseract.pytesseract.tesseract_cmd = found
+
+        # 用户可写目录存放语言包（避免 Program Files 权限问题）
+        user_tessdata = os.path.join(
+            os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+            "tesseract_tessdata")
+        os.makedirs(user_tessdata, exist_ok=True)
+        os.environ["TESSDATA_PREFIX"] = user_tessdata
+
+        # 复制 eng.traineddata（如果用户目录没有）
+        default_tessdata = os.path.join(os.path.dirname(found), "tessdata")
+        eng_src = os.path.join(default_tessdata, "eng.traineddata")
+        eng_dst = os.path.join(user_tessdata, "eng.traineddata")
+        if os.path.exists(eng_src) and not os.path.exists(eng_dst):
+            _shutil.copy2(eng_src, eng_dst)
+
+        # 检查中文语言包，缺失则自动下载
+        chi_sim_path = os.path.join(user_tessdata, "chi_sim.traineddata")
+        if not os.path.exists(chi_sim_path):
+            self.log("中文语言包缺失，正在自动下载...")
+            self.root.after(100, lambda: threading.Thread(
+                target=self._download_chi_sim, args=(user_tessdata,), daemon=True).start())
+        return True
+
+    def _download_chi_sim(self, tessdata_dir):
+        import urllib.request
+        url = "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
+        dest = os.path.join(tessdata_dir, "chi_sim.traineddata")
+        try:
+            self.root.after(0, lambda: self.log("下载中... (~15MB，首次需要等待)"))
+            urllib.request.urlretrieve(url, dest)
+            self.root.after(0, lambda: self.log("\u2705 中文语言包下载完成"))
+        except Exception as e:
+            self.root.after(0, lambda: self.log(
+                f"\u26a0 自动下载失败: {e}\n请手动下载 chi_sim.traineddata 放到 {tessdata_dir}"))
 
     def load_config_ui(self):
         self.api_key_var.set(self.config.get("api_key", ""))
