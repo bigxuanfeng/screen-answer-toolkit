@@ -9,6 +9,7 @@
   4. 全局热键 F6=开始  F7=停止
 """
 
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 import cv2
@@ -45,7 +46,10 @@ import json
 from datetime import datetime
 
 # ========== 目录配置 ==========
-BASE_DIR = os.path.dirname(__file__)
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(__file__)
 PATTERNS_DIR = os.path.join(BASE_DIR, "patterns")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 os.makedirs(PATTERNS_DIR, exist_ok=True)

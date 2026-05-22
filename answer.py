@@ -54,7 +54,10 @@ except ImportError:
     HAS_KEYBOARD = False
 
 # ========== 配置 ==========
-BASE_DIR = os.path.dirname(__file__) or "."
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(__file__) or "."
 CONFIG_FILE = os.path.join(BASE_DIR, "answer_config.json")
 
 
