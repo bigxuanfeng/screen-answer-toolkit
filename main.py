@@ -132,7 +132,7 @@ class ClickerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("屏幕图案连点器 v2.0")
-        self.root.geometry("720x620")
+        self.root.geometry("720x660")
         self.root.minsize(640, 540)
         self.root.configure(bg="#f0f2f5")
         self.root.attributes("-topmost", True)  # 窗口置顶
@@ -145,7 +145,9 @@ class ClickerApp:
         # ---- 配置变量 ----
         self.confidence = tk.DoubleVar(value=0.80)
         self.click_delay = tk.DoubleVar(value=0.5)
+        self.loop_interval = tk.DoubleVar(value=1.0)
         self.loop_mode = tk.StringVar(value="loop")   # loop | once
+        self.keep_capture = tk.BooleanVar(value=False)
 
         # ---- 加载 ----
         self.load_config()
@@ -222,6 +224,10 @@ class ClickerApp:
         self.btn_down = make_btn("↓ 下移", "#7f8c8d", self.move_down)
         self.btn_clear = make_btn("清空", "#95a5a6", self.clear_patterns)
 
+        tk.Checkbutton(op_frame, text="连续截图", variable=self.keep_capture,
+                       font=("微软雅黑", 9), bg="#f0f2f5",
+                       selectcolor="white").pack(side="left", padx=(10, 0))
+
         # ========== 设置 ==========
         sets = tk.LabelFrame(main, text="设置", font=("微软雅黑", 10, "bold"),
                              bg="#f0f2f5", padx=10, pady=5)
@@ -252,11 +258,24 @@ class ClickerApp:
         tk.Label(delay_frame, text="秒", font=("微软雅黑", 9),
                  bg="#f0f2f5").pack(side="left", padx=5)
 
+        # 循环间隔
+        tk.Label(sets, text="循环间隔:", font=("微软雅黑", 9),
+                 bg="#f0f2f5").grid(row=2, column=0, sticky="w", padx=3)
+        loop_frame = tk.Frame(sets, bg="#f0f2f5")
+        loop_frame.grid(row=2, column=1, sticky="w", padx=3)
+        tk.Scale(loop_frame, from_=0.1, to=30.0, resolution=0.5,
+                 orient="horizontal", length=180,
+                 variable=self.loop_interval,
+                 font=("微软雅黑", 7), bg="#f0f2f5",
+                 highlightthickness=0).pack(side="left")
+        tk.Label(loop_frame, text="秒", font=("微软雅黑", 9),
+                 bg="#f0f2f5").pack(side="left", padx=5)
+
         # 模式
         tk.Label(sets, text="执行模式:", font=("微软雅黑", 9),
-                 bg="#f0f2f5").grid(row=2, column=0, sticky="w", padx=3)
+                 bg="#f0f2f5").grid(row=3, column=0, sticky="w", padx=3)
         mode_frame = tk.Frame(sets, bg="#f0f2f5")
-        mode_frame.grid(row=2, column=1, sticky="w", padx=3)
+        mode_frame.grid(row=3, column=1, sticky="w", padx=3)
         tk.Radiobutton(mode_frame, text="♾ 无限循环", variable=self.loop_mode,
                        value="loop", font=("微软雅黑", 9),
                        bg="#f0f2f5", selectcolor="white").pack(side="left")
@@ -343,38 +362,41 @@ class ClickerApp:
         return sel[0] if sel else -1
 
     def capture_and_add(self):
-        """截图框选区域 → 保存为图案 → 加入列表"""
+        """截图框选区域 → 保存为图案 → 加入列表（连续截图模式下循环）"""
         if self.running:
             messagebox.showwarning("提示", "请先停止连点")
             return
 
-        # 不隐藏主窗口，直接弹出全屏遮罩
-        selector = RegionSelector(self.root)
-        self.root.wait_window(selector.root)  # 阻塞等待用户完成选择
+        while True:
+            selector = RegionSelector(self.root)
+            self.root.wait_window(selector.root)
 
-        region = selector.region
-        if not region:
-            self.log("✋ 取消截图")
-            return
+            region = selector.region
+            if not region:
+                self.log("✋ 取消截图")
+                break
 
-        left, top, w, h = region
-        self.log(f"📐 框选区域: ({left}, {top})  {w}x{h}")
+            left, top, w, h = region
+            self.log(f"📐 框选区域: ({left}, {top})  {w}x{h}")
 
-        # 截取该区域
-        raw = self.sct.grab({"left": left, "top": top,
-                             "width": w, "height": h})
-        gray = cv2.cvtColor(np.array(raw), cv2.COLOR_RGB2GRAY)
+            # 截取该区域
+            raw = self.sct.grab({"left": left, "top": top,
+                                 "width": w, "height": h})
+            gray = cv2.cvtColor(np.array(raw), cv2.COLOR_RGB2GRAY)
 
-        # 保存
-        ts = datetime.now().strftime("%H%M%S")
-        filename = f"pat_{ts}.png"
-        _cv2_write(os.path.join(PATTERNS_DIR, filename), gray)
+            # 保存
+            ts = datetime.now().strftime("%H%M%S")
+            filename = f"pat_{ts}.png"
+            _cv2_write(os.path.join(PATTERNS_DIR, filename), gray)
 
-        self.patterns.append(filename)
-        self.refresh_list()
+            self.patterns.append(filename)
+            self.refresh_list()
 
-        self.log(f"✅ 添加图案 #{len(self.patterns)}: {filename} ({w}x{h})")
-        self.save_config()
+            self.log(f"✅ 添加图案 #{len(self.patterns)}: {filename} ({w}x{h})")
+            self.save_config()
+
+            if not self.keep_capture.get():
+                break
 
     def remove_pattern(self):
         if self.running:
@@ -459,19 +481,20 @@ class ClickerApp:
         conf = self.confidence.get()
         delay = self.click_delay.get()
         mode = self.loop_mode.get()
+        loop_int = self.loop_interval.get()
         self.log("=" * 40)
-        self.log(f"🚀 开始连点 | 阈值={conf:.2f} 间隔={delay:.1f}s 模式={'♾循环' if mode=='loop' else '▶单轮'}")
+        self.log(f"🚀 开始连点 | 阈值={conf:.2f} 点击间隔={delay:.1f}s 循环间隔={loop_int:.1f}s 模式={'♾循环' if mode=='loop' else '▶单轮'}")
         self.log(f"   共 {len(self.patterns)} 个图案")
 
         threading.Thread(target=self._worker,
-                         args=(conf, delay, mode),
+                         args=(conf, delay, mode, loop_int),
                          daemon=True).start()
 
     def stop_clicking(self):
         self.running = False
         self.log("⏹ 手动停止")
 
-    def _worker(self, confidence, delay, mode):
+    def _worker(self, confidence, delay, mode, loop_interval):
         """后台工作线程"""
         loop = mode == "loop"
 
@@ -529,7 +552,8 @@ class ClickerApp:
                 self.log("✅ 全部执行完毕")
                 break
             else:
-                self.log("🔄 一轮执行完毕，继续循环...")
+                self.log(f"🔄 一轮执行完毕，等待 {loop_interval:.1f}s 后继续...")
+                time.sleep(loop_interval)
 
         # 恢复 UI
         self.root.after(0, self._on_finish)
@@ -554,7 +578,9 @@ class ClickerApp:
         data = {
             "confidence": round(self.confidence.get(), 2),
             "click_delay": round(self.click_delay.get(), 1),
+            "loop_interval": round(self.loop_interval.get(), 1),
             "loop_mode": self.loop_mode.get(),
+            "keep_capture": self.keep_capture.get(),
             "patterns": self.patterns,
         }
         try:
@@ -571,7 +597,9 @@ class ClickerApp:
                 data = json.load(f)
             self.confidence.set(data.get("confidence", 0.8))
             self.click_delay.set(data.get("click_delay", 0.5))
+            self.loop_interval.set(data.get("loop_interval", 1.0))
             self.loop_mode.set(data.get("loop_mode", "loop"))
+            self.keep_capture.set(data.get("keep_capture", False))
         except Exception:
             pass
 

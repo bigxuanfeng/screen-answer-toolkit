@@ -18,6 +18,7 @@ except Exception:
     except Exception:
         pass
 
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 import cv2
@@ -512,7 +513,11 @@ class AnswerApp:
                   command=self.answer_question).pack(side="left", padx=(0, 6))
         tk.Button(ocr_btn_row, text="\U0001f4cb 复制", font=("微软雅黑", 10),
                   bg="#555", fg="white", bd=0, padx=10, pady=4, cursor="hand2",
-                  command=self.copy_ocr_text).pack(side="left")
+                  command=self.copy_ocr_text).pack(side="left", padx=(0, 6))
+        self.keep_capture = tk.BooleanVar(value=True)
+        tk.Checkbutton(ocr_btn_row, text="保留截图框", variable=self.keep_capture,
+                       font=("微软雅黑", 10), bg="#f0f2f5",
+                       selectcolor="white").pack(side="left")
 
         # ===== AI 答案 =====
         ans_frame = tk.LabelFrame(main, text="AI 答案", font=("微软雅黑", 11, "bold"), bg="#f0f2f5", padx=8, pady=4)
@@ -622,7 +627,7 @@ class AnswerApp:
         if self.ai_client:
             self.api_status.config(text="\u2705 已配置", fg="#27ae60")
         self._update_region_display()
-        if self.saved_region:
+        if self.saved_region and self.keep_capture.get():
             self.show_persistent_border()
 
     # ==================== 业务逻辑 ====================
@@ -672,7 +677,8 @@ class AnswerApp:
         self.root.wait_window(overlay.root)
 
         if overlay.confirmed:
-            self.show_persistent_border()
+            if self.keep_capture.get():
+                self.show_persistent_border()
             self.log(f"\u2705 区域已固定: {region}，点击「截图识别」开始答题")
         else:
             self.log("\u2716 已取消")
@@ -759,17 +765,20 @@ class AnswerApp:
         self._process_region(self.saved_region)
 
     def quick_capture(self):
-        """截图识别：已固定区域直接识别，未固定则先框选"""
+        """截图识别：有边框直接识别，否则先框选；保留边框开关控制是否复用"""
         if not HAS_MSS:
             messagebox.showerror("缺少依赖", "请安装 mss: pip install mss")
             return
 
-        # 如果已有固定边框，直接识别
+        # 已有固定边框且保留模式开启 → 直接识别同一区域
         if self.saved_region and self._persistent_border:
             self.answer_text.delete("1.0", "end")
             self.ocr_text.delete("1.0", "end")
             self.log(f"\U0001f4f8 截图区域: {self.saved_region}")
             self._process_region(self.saved_region)
+            # 不保留边框 → 识别完消失
+            if not self.keep_capture.get():
+                self.hide_persistent_border()
             return
 
         self.root.update()
@@ -795,12 +804,16 @@ class AnswerApp:
             self.log("\u2716 已取消")
             return
 
-        # 显示固定边框并开始识别
-        self.show_persistent_border()
+        # 保留模式 → 显示固定边框；否则只识别不留框
+        if self.keep_capture.get():
+            self.show_persistent_border()
         self.answer_text.delete("1.0", "end")
         self.ocr_text.delete("1.0", "end")
         self.log(f"\U0001f4f8 截图区域: {region}")
         self._process_region(self.saved_region)
+        # 不保留 → 识别完即清除
+        if not self.keep_capture.get():
+            self.hide_persistent_border()
 
     def _update_region_display(self):
         if self.saved_region:
