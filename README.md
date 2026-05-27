@@ -9,21 +9,36 @@ OCR识别 + DeepSeek AI答题 + 多语言翻译 + OpenCV图案匹配连点器
 pip install -r requirements.txt
 ```
 
-### 2. 安装 Tesseract-OCR（必需，一步完成）
+### 2. 安装 Tesseract-OCR（必需）
 ```bash
 winget install UB-Mannheim.TesseractOCR
 ```
 首次运行软件时，中文语言包会**自动下载**，无需手动操作。
 
 ### 3. 启动
-双击 `launcher.pyw`（无终端窗口）或 `launch.bat`
+直接双击 `dist\工具箱.exe` 即可运行。
+
+### 4. 自行打包（可选）
+如需重新生成 `工具箱.exe`：
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --name 工具箱 toolkit.py
+```
 
 ## 功能
 
-| 工具 | 功能 |
-|------|------|
-| 📖 屏幕答题助手 | 框选屏幕区域 → OCR识别 → AI答题 → 多语言翻译成中文 |
-| 🖱 屏幕连点器 | 截图目标图案 → 自动匹配点击 → 支持多目标循环 |
+### 📖 屏幕答题助手 (`answer.py`)
+- 框选屏幕区域 → OCR识别文字 → DeepSeek AI答题 → 多语言翻译成中文
+- **保留截图框开关**：截图识别后可选择是否保留区域边框，方便连续截图
+- 支持快捷键 `Ctrl+Shift+A` 快速截图识别
+
+### 🖱 屏幕连点器 (`main.py`)
+- 截图目标图案 → OpenCV模板匹配 → 自动点击 → 支持多目标循环
+- **连续截图模式**：开启后可连续框选多个图案，无需反复点击添加
+- **循环间隔调节**：每轮执行完毕后的等待时间可调（0.1~30秒）
+- **循环/单轮模式**：支持无限循环或执行一轮即停
+- 配置自动保存，下次启动自动恢复
+- 支持快捷键 `F6` 开始 / `F7` 停止
 
 ## 配置
 
