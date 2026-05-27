@@ -2,6 +2,8 @@
 
 OCR识别 + DeepSeek AI答题 + 多语言翻译 + OpenCV图案匹配连点器
 
+[![Download](https://img.shields.io/badge/Download-toolbox.zip-blue)](https://github.com/bigxuanfeng/screen-answer-toolkit/releases/latest/download/toolbox.zip)
+
 ## 快速开始
 
 ### 1. 安装 Python 依赖
@@ -16,10 +18,10 @@ winget install UB-Mannheim.TesseractOCR
 首次运行软件时，中文语言包会**自动下载**，无需手动操作。
 
 ### 3. 启动
-直接双击 `dist\工具箱.exe` 即可运行。
+直接双击 `dist\工具箱.exe` 即可运行（从 Releases 下载的为 `toolbox.exe`）。
 
 ### 4. 自行打包（可选）
-如需重新生成 `工具箱.exe`：
+如需重新生成 exe：
 ```bash
 pip install pyinstaller
 pyinstaller --onefile --windowed --name 工具箱 toolkit.py

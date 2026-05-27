@@ -9,20 +9,18 @@ import os
 import subprocess
 import tkinter as tk
 
-# 显式导入子模块，确保 PyInstaller 能检测到
-import answer
-import main
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def run_answer():
+    import answer
     root = tk.Tk()
     answer.AnswerApp(root)
     root.mainloop()
 
 
 def run_clicker():
+    import main
     root = tk.Tk()
     main.ClickerApp(root)
     root.mainloop()
